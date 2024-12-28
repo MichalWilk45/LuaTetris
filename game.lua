@@ -30,22 +30,50 @@ end
 
 function Game:keypressed(key)
     if key == "left" then
-        -- Sprawdzenie, czy klocek nie wyjdzie poza lewą granicę planszy
-        if self.blockX > 1 then
+        -- Check if the block can move left without colliding
+        if self:blockCanMove(-1, 0) then
             self.blockX = self.blockX - 1
         end
     elseif key == "right" then
-        -- Sprawdzenie, czy klocek nie wyjdzie poza prawą granicę planszy
-        if self.blockX + #self.activeBlock[1] - 1 <= 10 then
+        -- Check if the block can move right without colliding
+        if self:blockCanMove(1, 0) then
             self.blockX = self.blockX + 1
         end
     elseif key == "down" then
-        -- Sprawdzenie, czy klocek nie wyjdzie poza dolną granicę planszy
-        if self.blockY + #self.activeBlock <= 20 then
+        -- Check if the block can move down without colliding
+        if self:blockCanMove(0, 1) then
             self.blockY = self.blockY + 1
         end
+
+    elseif key == "up" then
+        -- Check if the block can move down without colliding
+        self:rotatePiece()
     end
 end
+
+
+function Game:blockCanMove(dx, dy)
+    for y = 1, #self.activeBlock do
+        for x = 1, #self.activeBlock[y] do
+            if self.activeBlock[y][x] == 1 then
+                local newX = self.blockX + x - 1 + dx  -- Adjust for board indexing
+                local newY = self.blockY + y - 1 + dy  -- Adjust for board indexing
+
+                -- Check if the block is within the board boundaries
+                if newX < 1 or newX -1 > boardWidth or newY > boardHeight then
+                    return false
+                end
+
+                -- Check if the block collides with existing locked pieces
+                if self.board[newY] and self.board[newY][newX + 1] == 1 then
+                    return false
+                end
+            end
+        end
+    end
+    return true
+end
+
 
 
 -- Funkcja opadającego klocka
@@ -72,7 +100,7 @@ function Game:checkCollision()
         for x = 1, #self.activeBlock[y] do
             if self.activeBlock[y][x] == 1 then
                 -- Calculate the actual position on the board
-                local boardX = self.blockX + x - 1  -- Adjust for 0-based indexing on the board
+                local boardX = self.blockX + x  -- Adjust for 0-based indexing on the board
                 local boardY = self.blockY + y - 1  -- Adjust for 0-based indexing on the board
 
                 -- Check if the block has reached the bottom of the screen (bottom edge)
@@ -100,19 +128,16 @@ function Game:lockBlock()
         for x = 1, #self.activeBlock[y] do
             if self.activeBlock[y][x] == 1 then
                 local boardX = self.blockX + x 
-                local boardY = self.blockY + y  
-                print("Locking block at", boardX, boardY)
-
+                local boardY = self.blockY + y - 1
 
                 -- Tworzymy nową linię, jeśli nie istnieje
                 if not self.board[boardY] then
-                    print("Creating new board line", boardY)
 
                     self.board[boardY] = {}
                 end
 
                 -- Blokowanie klocka na planszy
-                self.board[boardY-1][boardX] = 1
+                self.board[boardY][boardX] = 1
             end
         end
     end
@@ -177,7 +202,52 @@ function Game:draw()
         end
     end
     love.graphics.setColor(1, 1, 1)  -- Kolor krawędzi (biały)
-    love.graphics.rectangle("line", 20, 0, (boardWidth -1)* 20, boardHeight * 20)  -- Rysowanie prostokąta wokół planszy
+    love.graphics.rectangle("line", 20, 0, (boardWidth + 1)* 20, (boardHeight) * 20)  -- Rysowanie prostokąta wokół planszy
 end
+
+function Game:rotatePiece()
+    -- Create a rotated copy of the active block
+    local rotatedBlock = {}
+    local blockRows = #self.activeBlock
+    local blockColumns = #self.activeBlock[1]
+    print("BlockRows: ", blockRows)
+    print("BlockColumns: ", blockColumns)
+
+    for x = 1, blockColumns do
+        rotatedBlock[x] = {}
+        for y = 1, blockRows do
+            rotatedBlock[x][y] = self.activeBlock[blockRows - y + 1][x]
+        end
+    end
+
+    -- Check for collisions or boundaries
+    if self:canRotate(rotatedBlock) then
+        self.activeBlock = rotatedBlock
+    end
+end
+
+function Game:canRotate(rotatedBlock)
+    for y = 1, #rotatedBlock do
+        for x = 1, #rotatedBlock[y] do
+            if rotatedBlock[y][x] == 1 then
+                local boardX = self.blockX + x - 1
+                local boardY = self.blockY + y - 1
+
+                -- Check boundaries
+                if boardX < 1 or boardX > boardWidth or boardY > boardHeight then
+                    return false
+                end
+
+                -- Check collisions with locked pieces
+                if self.board[boardY] and self.board[boardY][boardX] == 1 then
+                    return false
+                end
+            end
+        end
+    end
+    return true
+end
+
+
 
 return Game
